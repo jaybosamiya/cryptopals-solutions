@@ -1,5 +1,6 @@
 #! /usr/bin/env python
 
+import sys
 from binascii import a2b_base64
 from random import randint
 from AES_128 import AES_128_ECB_decrypt, AES_128_ECB_encrypt, pkcs_7_unpad
@@ -10,7 +11,7 @@ def gen_rand_data(length = 16):
 def encryption_oracle(data):
   if not hasattr(encryption_oracle, "key"):
     encryption_oracle.key = gen_rand_data()
-  data = gen_rand_data(randint(0,255)) + data + a2b_base64(
+  data = gen_rand_data(randint(3,255)) + data + a2b_base64(
     'Um9sbGluJyBpbiBteSA1LjAKV2l0aCBteSByYWctdG9wIGRvd24gc28gbXkg'+
     'aGFpciBjYW4gYmxvdwpUaGUgZ2lybGllcyBvbiBzdGFuZGJ5IHdhdmluZyBq'+
     'dXN0IHRvIHNheSBoaQpEaWQgeW91IHN0b3A/IE5vLCBJIGp1c3QgZHJvdmUg'+
@@ -44,32 +45,23 @@ def verify_ECB_mode(oracle, block_size):
   return is_ECB_encoded(oracle(inp),block_size)
 
 def remove_all_random_chars(oracle, block_size):
-  suffix = [None]*block_size
-  minlen = [None]*block_size
-  for i in range(block_size):
-    replies = []
+  def block_matching_oracle(data):
     while True:
-      r = oracle('A'*i)
-      if r in replies:
-        break
-      else:
-        replies.append(r)
-    suffix[i] = r[-block_size:]
-    minlen[i] = len(r)
+      r = oracle('\x00'*3*block_size + data)
+      for i in range(len(r)/block_size - 2):
+        if r[(i+0)*block_size:(i+1)*block_size] ==  \
+           r[(i+1)*block_size:(i+2)*block_size] and \
+           r[(i+1)*block_size:(i+2)*block_size] ==  \
+           r[(i+2)*block_size:(i+3)*block_size]:
+          return r[(i+3)*block_size:]
 
-  def suffix_oriented_oracle(data):
-    a = len(data) / block_size
-    b = len(data) % block_size
-
-    while True:
-      r = oracle(data)
-      if len(r) == a*block_size + minlen[b]:
-        if r[-block_size:] == suffix[b]:
-          return r
-
-  return suffix_oriented_oracle
+  return block_matching_oracle
 
 def pull_next_letter(oracle, block_size, known_plaintext_prefix):
+  if len(known_plaintext_prefix) >= 1 and ord(known_plaintext_prefix[-1]) < 2:
+    # We're into padding section. Just raise exception to break out
+    raise Exception
+
   required_prefix_len = (block_size - (1 + len(known_plaintext_prefix))) % block_size
   fixed_prefix = 'A'*required_prefix_len
 
@@ -77,10 +69,16 @@ def pull_next_letter(oracle, block_size, known_plaintext_prefix):
 
   real_text = oracle(fixed_prefix)[:tested_block_len]
 
-  for i in range(256):
-    attack_text = fixed_prefix + known_plaintext_prefix + chr(i)
-    if real_text == oracle(attack_text)[:tested_block_len]:
-      return chr(i)
+  while True:
+    for i in range(1,256):
+      attack_text = fixed_prefix + known_plaintext_prefix + chr(i)
+      if real_text == oracle(attack_text)[:tested_block_len]:
+        if oracle(fixed_prefix)[:tested_block_len] == oracle(attack_text)[:tested_block_len]: # Just verification
+          return chr(i)
+        else:
+          real_text = oracle(fixed_prefix)[:tested_block_len]
+
+  print "[!] Couldn't find character"
 
 def crack(oracle):
   block_size = get_len_of_block_cipher(oracle)

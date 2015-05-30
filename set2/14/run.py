@@ -8,10 +8,8 @@ def gen_rand_data(length = 16):
   return ''.join(chr(randint(0,255)) for i in range(length))
 
 def encryption_oracle(data):
-  global temp_remove_asap_key
   if not hasattr(encryption_oracle, "key"):
     encryption_oracle.key = gen_rand_data()
-    temp_remove_asap_key = encryption_oracle.key # TEMP ONLY # REMOVE ASAP
   data = gen_rand_data(randint(0,255)) + data + a2b_base64(
     'Um9sbGluJyBpbiBteSA1LjAKV2l0aCBteSByYWctdG9wIGRvd24gc28gbXkg'+
     'aGFpciBjYW4gYmxvdwpUaGUgZ2lybGllcyBvbiBzdGFuZGJ5IHdhdmluZyBq'+

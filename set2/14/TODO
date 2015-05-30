@@ -1,0 +1,1 @@
+What if encryption_oracle used `data = gen_rand_data(randint(x,255)) + data + `... for encryption where x is strictly positive?

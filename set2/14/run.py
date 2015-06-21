@@ -57,10 +57,13 @@ def remove_all_random_chars(oracle, block_size):
 
   return block_matching_oracle
 
+class NoChars(Exception):
+  """ No characters in stream """
+
 def pull_next_letter(oracle, block_size, known_plaintext_prefix):
   if len(known_plaintext_prefix) >= 1 and ord(known_plaintext_prefix[-1]) < 2:
     # We're into padding section. Just raise exception to break out
-    raise Exception
+    raise NoChars
 
   required_prefix_len = (block_size - (1 + len(known_plaintext_prefix))) % block_size
   fixed_prefix = 'A'*required_prefix_len
@@ -98,7 +101,7 @@ def crack(oracle):
     try:
       message += pull_next_letter(oracle, block_size, message)
       print message
-    except:
+    except NoChars:
       break
 
   return pkcs_7_unpad(message)
